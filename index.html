@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pressure Vessel Mixer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vessel Mixer">
+<meta name="theme-color" content="#eef1f3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0;font:14px system-ui,sans-serif} [hidden]{display:none!important} img{max-width:100%}</style>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one instrument panel. Canvas schematic on top, control strip below. */
+:root {
+  --bg: #eef1f3;
+  --panel: #ffffff;
+  --fg: #1b2328;
+  --muted: #5c6a73;
+  --line: #c9d1d6;
+  --steel: #8d9aa3;
+  --steel-dark: #56646d;
+  --vessel: #f7f9fa;
+  --accent: #d07a12;
+  --red: #d8423a;
+  --blue: #2f6fd6;
+  --green: #22975a;
+  --closed: #9aa5ac;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161a; --panel: #192026; --fg: #e3e8eb; --muted: #93a1aa; --line: #2c363d;
+    --steel: #5d6b74; --steel-dark: #8796a0; --vessel: #0d1216; --accent: #f0a040;
+    --red: #f0605a; --blue: #5b93f0; --green: #3cc47e; --closed: #4a555c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161a; --panel: #192026; --fg: #e3e8eb; --muted: #93a1aa; --line: #2c363d;
+  --steel: #5d6b74; --steel-dark: #8796a0; --vessel: #0d1216; --accent: #f0a040;
+  --red: #f0605a; --blue: #5b93f0; --green: #3cc47e; --closed: #4a555c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 30px; letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; line-height: 1.45; }
+.readout { display: flex; gap: 20px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.readout div { display: grid; gap: 2px; }
+.readout span { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.readout b { font-weight: 500; font-size: 20px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; max-width: 100%; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.ctl { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ctl label { font-family: var(--font-display); font-weight: 500; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 14px; }
+.state { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.state.open { color: var(--green); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.btns { display: flex; gap: 8px; }
+button {
+  font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
+  padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--steel-dark); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.presets { display: grid; gap: 10px; }
+.preset-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.preset-btns button[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+.preset-note { margin: 0; color: var(--muted); line-height: 1.45; max-width: 90ch; min-height: 1.45em; }
+.preset-note b { color: var(--fg); font-weight: 500; }
+.stage { position: relative; }
+.hud { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; pointer-events: none; }
+.chip {
+  position: absolute; width: 210px; pointer-events: auto; display: grid; gap: 4px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+.chip-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.chip label { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+.chip .val { font-size: 13px; }
+.chip input[type=range] { margin: 0 0 4px; }
+/* Narrow screens: the diagram is too small to hold usable sliders, so they drop below it */
+.stage.stacked .hud { position: static; width: auto; height: auto; transform: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; padding: 12px; border-top: 1px solid var(--line); }
+.stage.stacked .chip { position: static; width: auto !important; box-shadow: none; }
+.show { display: grid; gap: 16px; }
+/* Full-screen show mode: presets, diagram and buttons fill the screen; the diagram keeps its
+   16:9 layout and is only scaled to the largest size that fits. */
+.show.is-show {
+  position: fixed; inset: 0; z-index: 50; overflow: auto;
+  background: var(--bg); align-content: center; gap: 12px;
+  padding-block: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.show.is-show .stage { width: min(100%, calc((100dvh - 190px) * 16 / 9)); justify-self: center; }
+.show.is-show .presets, .show.is-show .bar { width: min(100%, calc((100dvh - 190px) * 16 / 9)); justify-self: center; }
+.show.is-show .note { display: none; }
+.show.is-show .bar { justify-content: flex-end; }
+.chip { transform: scale(var(--boost, 1)); transform-origin: top left; }
+.mix-chip { transform: none; }  /* display only, already large enough */
+.preset-menu, .rotate-hint { display: none; }
+.preset-menu { align-items: center; gap: 8px; }
+.preset-menu label { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.preset-menu select {
+  font: 500 15px var(--font-body); color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; min-width: 0; max-width: 100%;
+}
+.rotate-hint { margin: 0; padding: 10px 12px; border: 1px dashed var(--steel); border-radius: 6px; color: var(--fg); background: var(--panel); line-height: 1.4; }
+
+/* Phones (set from script by screen size) */
+.phone .preset-btns { display: none; }
+.phone .preset-menu { display: flex; }
+.phone.portrait .rotate-hint { display: block; }
+.phone.portrait .hud { display: none; }
+
+/* Phone full screen: the diagram fills the sideways screen, with a slim column of controls beside it */
+.phone .show.is-show {
+  grid-template-columns: auto auto; grid-template-areas: "stage presets" "stage bar";
+  align-content: center; justify-content: center; align-items: center; column-gap: 12px; row-gap: 12px;
+}
+.phone .show.is-show .stage { grid-area: stage; width: min(calc(100vw - 190px), calc((100dvh - 24px) * 16 / 9)); }
+.phone .show.is-show .presets { grid-area: presets; width: 140px; align-self: end; }
+.phone .show.is-show .bar { grid-area: bar; width: 140px; align-self: start; }
+.phone .show.is-show .preset-menu { flex-direction: column; align-items: stretch; }
+.phone .show.is-show .preset-menu select { width: 100%; }
+.phone .show.is-show .preset-note, .phone .show.is-show .rotate-hint { display: none; }
+.phone .show.is-show .btns { flex-direction: column; width: 100%; }
+.phone.portrait .show.is-show { grid-template-columns: 1fr; grid-template-areas: "presets" "stage" "bar"; }
+.phone.portrait .show.is-show .rotate-hint { display: block; }
+.phone.portrait .show.is-show .stage, .phone.portrait .show.is-show .presets, .phone.portrait .show.is-show .bar { width: 100%; }
+.note { color: var(--muted); font-size: 13px; max-width: 80ch; line-height: 1.45; }
+.sub-ctl { display: grid; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.sub-ctl label { font-size: 13px; color: var(--muted); }
+.mix-name { font-family: var(--font-display); font-weight: 500; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; }
+.mix-bar { display: flex; height: 12px; border-radius: 2px; overflow: hidden; background: var(--vessel); border: 1px solid var(--line); }
+.mix-bar i { display: block; height: 100%; transition: width 0.3s linear; }
+.mix-pct { display: flex; flex-wrap: wrap; gap: 2px 14px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mix-pct span { display: inline-flex; align-items: center; gap: 5px; }
+.mix-pct .dot { width: 8px; height: 8px; }
+/* mix panels on the diagram: 1.5x the base size */
+.mix-chip { gap: 6px; padding: 10px 14px; }
+.mix-chip .mix-name { font-size: 19px; }
+.mix-chip .mix-bar { height: 18px; border-radius: 3px; }
+.mix-chip .mix-pct { font-size: 17px; gap: 3px 20px; }
+.mix-chip .mix-pct span { gap: 7px; }
+.mix-chip .mix-pct .dot { width: 12px; height: 12px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Pressure Vessel Mixer</h1>
+      <p class="sub">Sources A and B come in from the right into the side of the vessel. Source C comes down the left side and along the bottom into the vessel. The outlet leaves the top of the vessel and sprays into the open air on the right. A source only flows while its pressure is above the vessel's. A and B have a hand valve before the vessel, C has a one-way valve, and the vessel drains through the outlet valve.</p>
+    </div>
+    <div class="readout" aria-live="off">
+      <div><span>Vessel pressure</span><b id="pv">0.00</b></div>
+      <div><span>Particles</span><b id="count">0</b></div>
+    </div>
+  </header>
+
+  <div class="show" id="show">
+  <div class="presets">
+    <div class="preset-btns" role="group" aria-label="Scenarios">
+      <button type="button" data-preset="start">Starting point</button>
+      <button type="button" data-preset="weak">Weak source shut out</button>
+      <button type="button" data-preset="balanced">All balanced</button>
+      <button type="button" data-preset="overpower">One source overpowers</button>
+      <button type="button" data-preset="throttled">Throttled high pressure</button>
+      <button type="button" data-preset="closed">Outlet closed</button>
+    </div>
+    <div class="preset-menu">
+      <label for="presetSelect">Scenario</label>
+      <select id="presetSelect">
+        <option value="start">Starting point</option>
+        <option value="weak">Weak source shut out</option>
+        <option value="balanced">All balanced</option>
+        <option value="overpower">One source overpowers</option>
+        <option value="throttled">Throttled high pressure</option>
+        <option value="closed">Outlet closed</option>
+        <option value="custom" disabled>Custom settings</option>
+      </select>
+    </div>
+    <p class="preset-note" id="presetNote"></p>
+  </div>
+  <p class="rotate-hint">Turn your phone sideways to see the full diagram and use its controls.</p>
+
+  <div class="stage" id="stage"><canvas id="cv" width="1280" height="720" aria-label="Animated vessel. Red and blue come in from the right into the side of the vessel, green comes down the left side and along the bottom, and the outlet leaves the top of the vessel and sprays into the open air on the right."></canvas>
+    <!-- Controls laid over the diagram, positioned in diagram coordinates (1280 x 720) -->
+    <div class="hud" id="hud">
+      <div class="chip mix-chip" style="left: 330px; top: 12px; width: 390px;" aria-label="Color mix inside the vessel">
+        <span class="mix-name">Inside vessel</span>
+        <div class="mix-bar"><i id="mv0" style="background:var(--red)"></i><i id="mv1" style="background:var(--blue)"></i><i id="mv2" style="background:var(--green)"></i></div>
+        <div class="mix-pct" id="mvp"></div>
+      </div>
+      <div class="chip mix-chip" style="left: 866px; top: 12px; width: 390px;" aria-label="Color mix of the last 100 particles out">
+        <span class="mix-name">Leaving outlet</span>
+        <div class="mix-bar"><i id="mo0" style="background:var(--red)"></i><i id="mo1" style="background:var(--blue)"></i><i id="mo2" style="background:var(--green)"></i></div>
+        <div class="mix-pct" id="mop"></div>
+      </div>
+      <div class="chip" style="left: 24px; top: 14px;">
+        <div class="chip-row"><label for="p2"><i class="dot" style="background:var(--green)"></i>Source C pressure</label><span class="val" id="v2"></span></div>
+        <input id="p2" type="range" min="0" max="10" step="0.1" value="4">
+      </div>
+      <div class="chip" style="left: 525px; top: 230px;">
+        <div class="chip-row"><label for="valve">Outlet valve</label><span class="val" id="vv"></span></div>
+        <input id="valve" type="range" min="0" max="100" step="1" value="50">
+      </div>
+      <div class="chip" style="left: 940px; top: 330px;">
+        <div class="chip-row"><label for="p1"><i class="dot" style="background:var(--blue)"></i>Source B pressure</label><span class="val" id="v1"></span></div>
+        <input id="p1" type="range" min="0" max="10" step="0.1" value="6">
+        <div class="chip-row"><label for="g1">Hand valve B</label><span class="val" id="gv1"></span></div>
+        <input id="g1" type="range" min="0" max="100" step="1" value="30">
+      </div>
+      <div class="chip" style="left: 940px; top: 570px;">
+        <div class="chip-row"><label for="p0"><i class="dot" style="background:var(--red)"></i>Source A pressure</label><span class="val" id="v0"></span></div>
+        <input id="p0" type="range" min="0" max="10" step="0.1" value="8">
+        <div class="chip-row"><label for="g0">Hand valve A</label><span class="val" id="gv0"></span></div>
+        <input id="g0" type="range" min="0" max="100" step="1" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <span class="note">Pressures are in bar, 0 to 10. The vessel reads 10 bar when it holds 400 particles, and the outlet vents to 0 bar. Pipes are packed solid up to each hand valve, and the packing gets tighter as the pressure behind it rises. "Leaving outlet" shows the last 100 particles out. On each source dial, the dark dot marks the vessel's pressure. On the vessel dial, the colored dots mark each source.</span>
+    <div class="btns"><button id="pause" type="button">Pause</button><button id="reset" type="button">Empty vessel</button><button id="full" type="button">Full screen</button></div>
+  </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = 1280, H = 720;
+
+  // Rules (agreed with the user)
+  const CAP = 400;        // particles that make the vessel read 10 bar
+  const K_IN = 14;        // particles/sec per bar of pressure difference, hand valve fully open
+  const K_OUT = 16;       // particles/sec per bar at a fully open outlet valve
+  const PMAX = 10;
+  const SPEED = 260;      // free-flow speed after a valve, px/s
+
+  // Geometry (16:9 landscape)
+  const V = { x: 150, y: 270, w: 360, h: 270 };  // vessel interior
+  const R = 6;                                    // particle radius
+  const PIPE = 26;
+  // Each inlet is a pipe path from its source on the left edge to its mouth on the vessel.
+  // checkS / gateS: distance along the path to the one-way valve and the hand valve.
+  const inlets = [
+    // anchorS: where the source dial is placed from. check: whether the line has a one-way valve.
+    // red: source lined up with the outlet's end, runs left low down, then doglegs up into the vessel side
+    { color: 'red',   gate: 'g0', pts: [[900, 600], [600, 600], [600, 470], [V.x + V.w, 470]], check: false, anchorS: 160, gateS: 160, dial: [0, 84] },
+    // blue: source lined up with the outlet's end, straight into the right side of the vessel, below the outlet spray
+    { color: 'blue',  gate: 'g1', pts: [[900, 360], [V.x + V.w, 360]],                      check: false, anchorS: 100, gateS: 230, dial: [0, 64] },
+    // green: from the top edge down the left side, along the bottom, up into the vessel bottom; one-way valve on the bottom run
+    { color: 'green', gate: null, pts: [[60, 110], [60, 650], [350, 650], [350, V.y + V.h]], check: true, anchorS: 540 + 80, checkS: 540 + 80, gateS: null, dial: [60, -58] },
+  ];
+  // Outlet: up out of the vessel top, then right; the pipe ends and sprays into the open air
+  const outlet = { pts: [[390, V.y], [390, 180], [900, 180]], gateS: 90 + 150 };
+  for (const it of [...inlets, outlet]) {
+    it.segs = []; let L = 0;
+    for (let k = 1; k < it.pts.length; k++) {
+      const [x0, y0] = it.pts[k - 1], [x1, y1] = it.pts[k];
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      it.segs.push({ x0, y0, dx: (x1 - x0) / len, dy: (y1 - y0) / len, s0: L, len });
+      L += len;
+    }
+    it.len = L;
+    if (it !== outlet) it.gateEl = it.gate ? document.getElementById(it.gate) : null;
+    const last = it.segs[it.segs.length - 1];
+    it.endDir = { x: last.dx, y: last.dy };
+    it.mouth = { x: it.pts[it.pts.length - 1][0], y: it.pts[it.pts.length - 1][1] };
+  }
+  // Point along an inlet path, shifted sideways by `off`
+  function posAt(it, s, off = 0) {
+    let g = it.segs[it.segs.length - 1];
+    for (const sg of it.segs) if (s <= sg.s0 + sg.len) { g = sg; break; }
+    const t = s - g.s0;
+    return { x: g.x0 + g.dx * t - g.dy * off, y: g.y0 + g.dy * t + g.dx * off, dx: g.dx, dy: g.dy };
+  }
+  outlet.start = { x: outlet.pts[0][0], y: outlet.pts[0][1] };
+  outlet.end = { x: outlet.pts[outlet.pts.length - 1][0], y: outlet.pts[outlet.pts.length - 1][1] };
+  outlet.gate = posAt(outlet, outlet.gateS);
+  const gauge = { x: 255, y: 190, r: 56 };
+
+  const sliders = [0, 1, 2].map(i => document.getElementById('p' + i));
+  const valveEl = document.getElementById('valve');
+  const gateOpen = i => inlets[i].gateEl ? inlets[i].gateEl.value / 100 : 1;
+
+  let particles = [];   // in vessel
+  let piping = [];      // free-flowing in a pipe after a valve
+  let acc = [0, 0, 0], accOut = 0;
+  let moved = [0, 0, 0]; // particles passed by each inlet, drives the packed column's motion
+  let outQueue = [];     // colors packed in the outlet pipe between vessel and outlet valve
+  let exitLog = [];      // colors of the most recent particles to leave
+  let paused = false;
+  let colors = {};
+
+  function readColors() {
+    const s = getComputedStyle(document.documentElement);
+    for (const k of ['red','blue','green','steel','steel-dark','vessel','line','fg','muted','closed','accent','panel'])
+      colors[k] = s.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const vesselPressure = () => PMAX * particles.length / CAP;
+  // Spacing of packed particles along a pipe: tighter at higher pressure
+  const pitch = p => 26 - 1.6 * Math.max(0, Math.min(PMAX, p));
+  const lane = k => (k % 2 ? 1 : -1) * (PIPE / 2 - R - 1);
+  const outLen = outlet.gateS - 18;
+
+  function spawnInlet(i) {
+    const it = inlets[i];
+    // free particles start at the hand valve for A and B, at the one-way valve for C
+    const s0 = (it.gateS ?? it.checkS) + 18;
+    piping.push({ s: s0, off: (Math.random() - 0.5) * (PIPE - 2 * R - 2), c: i, phase: 'in' });
+  }
+
+  function pickNearOutlet() {
+    const ox = outlet.start.x, oy = outlet.start.y;
+    // Nearest of a random sample, so the outlet favors nearby particles without carving out a void
+    let best = 0, bd = Infinity;
+    for (let n = 0; n < 12; n++) {
+      const k = Math.floor(Math.random() * particles.length);
+      const p = particles[k], d = (p.x - ox) ** 2 + (p.y - oy) ** 2;
+      if (d < bd) { bd = d; best = k; }
+    }
+    return particles.splice(best, 1)[0];
+  }
+
+  function outCapacity() { return Math.max(0, Math.floor(outLen / pitch(vesselPressure())) * 2); }
+
+  function releaseOne() {
+    if (!particles.length) return;
+    const p = pickNearOutlet();
+    outQueue.push(p.c);
+    // the particle at the valve end leaves into the free pipe
+    if (outQueue.length > outCapacity()) {
+      const c = outQueue.shift();
+      exitLog.push(c); if (exitLog.length > 100) exitLog.shift();
+      piping.push({ s: outlet.gateS + 18, off: lane(outQueue.length), c, phase: 'out' });
+    }
+  }
+
+  function step(dt) {
+    const pv = vesselPressure();
+    const valve = valveEl.value / 100;
+
+    // Inflow: one-way valve, then hand valve
+    for (let i = 0; i < 3; i++) {
+      const dp = sliders[i].value - pv;
+      const rate = dp > 0 ? K_IN * gateOpen(i) * dp : 0;
+      if (rate > 0) {
+        acc[i] += rate * dt; moved[i] += rate * dt;
+        while (acc[i] >= 1) { spawnInlet(i); acc[i] -= 1; }
+      } else acc[i] = 0;
+    }
+
+    // Keep the outlet pipe packed up to the outlet valve
+    const capOut = outCapacity();
+    while (outQueue.length < capOut && particles.length > 0 && pv > 0.3) outQueue.push(pickNearOutlet().c);
+    // pressure dropping lets the packed column relax back into the vessel
+    while (outQueue.length > capOut + 1) {
+      const c = outQueue.pop();
+      particles.push({ x: outlet.start.x, y: V.y + R + 2, vx: (Math.random() - 0.5) * 100, vy: 100, c });
+    }
+
+    // Outflow
+    if (valve > 0 && pv > 0) {
+      accOut += K_OUT * valve * pv * dt;
+      while (accOut >= 1) { releaseOne(); accOut -= 1; }
+    } else accOut = 0;
+
+    // Free pipe travel
+    for (let k = piping.length - 1; k >= 0; k--) {
+      const q = piping[k];
+      const it = inlets[q.c];
+      if (q.phase === 'in') {
+        q.s += SPEED * dt;
+        if (q.s >= it.len + R) {
+          const d = it.endDir, sp = 120 + Math.random() * 80, side = (Math.random() - 0.5) * 120;
+          particles.push({ x: it.mouth.x + d.x * R - d.y * q.off, y: it.mouth.y + d.y * R + d.x * q.off, vx: d.x * sp - d.y * side, vy: d.y * sp + d.x * side, c: q.c });
+          piping.splice(k, 1);
+        }
+        continue;
+      }
+      // outlet: along the pipe, then spray into the atmosphere in a cone
+      if (!q.free) {
+        q.s += SPEED * dt;
+        const p = posAt(outlet, Math.min(q.s, outlet.len), q.off);
+        q.x = p.x; q.y = p.y;
+        if (q.s >= outlet.len) {
+          q.free = true;
+          const a = Math.atan2(outlet.endDir.y, outlet.endDir.x) + (Math.random() - 0.5) * 0.7, sp = 170 + Math.random() * 110;
+          q.vx = Math.cos(a) * sp; q.vy = Math.sin(a) * sp;
+        }
+        continue;
+      }
+      q.vx += (Math.random() - 0.5) * 300 * dt; q.vy += (Math.random() - 0.5) * 300 * dt;
+      q.x += q.vx * dt; q.y += q.vy * dt;
+      if (q.x > W + 20 || q.x < -20 || q.y < -20 || q.y > H + 20) piping.splice(k, 1);
+    }
+
+    // Mixing: random drift and wall bounces
+    const jit = 2600 * dt, damp = Math.pow(0.6, dt);
+    for (const p of particles) {
+      p.vx = p.vx * damp + (Math.random() - 0.5) * jit;
+      p.vy = p.vy * damp + (Math.random() - 0.5) * jit;
+      const sp = Math.hypot(p.vx, p.vy), max = 280;
+      if (sp > max) { p.vx *= max / sp; p.vy *= max / sp; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < V.x + R) { p.x = V.x + R; p.vx = Math.abs(p.vx); }
+      if (p.x > V.x + V.w - R) { p.x = V.x + V.w - R; p.vx = -Math.abs(p.vx); }
+      if (p.y < V.y + R) { p.y = V.y + R; p.vy = Math.abs(p.vy); }
+      if (p.y > V.y + V.h - R) { p.y = V.y + V.h - R; p.vy = -Math.abs(p.vy); }
+    }
+  }
+
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+  function dot(x, y, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); }
+
+  // Pressure dial: 270 degree sweep, 0 to 10 bar
+  const A0 = 0.75 * Math.PI, SWEEP = 1.5 * Math.PI;
+  const ang = v => A0 + SWEEP * Math.max(0, Math.min(PMAX, v)) / PMAX;
+  function drawDial(cx, cy, r, value, color, opts = {}) {
+    ctx.fillStyle = colors.panel;
+    ctx.strokeStyle = colors.line; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    const tr = r - 7;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = colors.line; ctx.lineWidth = r > 40 ? 6 : 4;
+    ctx.beginPath(); ctx.arc(cx, cy, tr, A0, A0 + SWEEP); ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.beginPath(); ctx.arc(cx, cy, tr, A0, ang(value)); ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = colors.muted; ctx.lineWidth = 1.2;
+    ctx.fillStyle = colors.muted; ctx.font = '500 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let t = 0; t <= PMAX; t += 2) {
+      const a = ang(t), c = Math.cos(a), s = Math.sin(a);
+      ctx.beginPath(); ctx.moveTo(cx + c * (tr - 6), cy + s * (tr - 6)); ctx.lineTo(cx + c * (tr - 11), cy + s * (tr - 11)); ctx.stroke();
+      if (opts.numbers) ctx.fillText(t, cx + c * (tr - 20), cy + s * (tr - 20));
+    }
+    for (const m of opts.marks || []) {
+      const a = ang(m.v);
+      ctx.fillStyle = m.color;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5), m.size || 4, 0, Math.PI * 2); ctx.fill();
+    }
+    const a = ang(value);
+    ctx.strokeStyle = colors.fg; ctx.lineWidth = r > 40 ? 3 : 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (tr - 4), cy + Math.sin(a) * (tr - 4)); ctx.stroke();
+    ctx.fillStyle = colors.fg; ctx.beginPath(); ctx.arc(cx, cy, r > 40 ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = colors.fg; ctx.font = (r > 40 ? '500 17px' : '500 12px') + ' "IBM Plex Mono", monospace';
+    ctx.fillText(value.toFixed(r > 40 ? 2 : 1), cx, cy + r * (r > 40 ? 0.72 : 0.5));
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Hand valve: bow-tie body with a handle that turns with the opening
+  function drawGate(x, y, open, vertical, label) {
+    const c = open > 0 ? colors['steel-dark'] : colors.closed;
+    ctx.save(); ctx.translate(x, y); if (vertical) ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = colors.panel; ctx.strokeStyle = c; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-18, -16); ctx.lineTo(18, 16); ctx.lineTo(18, -16); ctx.lineTo(-18, 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    // handle wheel above (or beside) the body
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = colors.panel; ctx.strokeStyle = c; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.rotate((1 - open) * Math.PI / 2 + (vertical ? Math.PI / 2 : 0));
+    ctx.fillStyle = c; ctx.fillRect(-8, -2, 16, 4);
+    ctx.restore();
+    ctx.fillStyle = colors.fg; ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.textAlign = vertical ? 'right' : 'center';
+    ctx.fillText(label, vertical ? x - 26 : x, vertical ? y + 4 : y + 38);
+  }
+
+  function draw() {
+    const pv = vesselPressure();
+    ctx.clearRect(0, 0, W, H);
+
+    // Inlet pipes
+    ctx.lineJoin = 'miter';
+    for (let i = 0; i < 3; i++) {
+      const it = inlets[i], col = colors[it.color];
+      ctx.beginPath(); it.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.strokeStyle = colors.line; ctx.lineWidth = PIPE + 8; ctx.stroke();
+      ctx.strokeStyle = colors.vessel; ctx.lineWidth = PIPE; ctx.stroke();
+
+      // Packed column from the source up to the first valve that holds it back
+      const P = Number(sliders[i].value);
+      if (P > 0) {
+        const pt = pitch(P);
+        const end = (it.gateS ?? it.checkS) - 18;        // A, B: hand valve. C: one-way valve
+        // staggered two-lane packing; each particle passed moves the column half a pitch
+        const half = pt / 2, shift = moved[i] * half;
+        const off = shift % half, base = Math.floor(shift / half);
+        for (let d = -half + off, k = 0; d < end; d += half, k++) {
+          if (d < 14) continue;
+          const p = posAt(it, d, lane(k - base));
+          dot(p.x, p.y, col);
+        }
+      }
+      ctx.fillStyle = col;
+      const s0 = it.segs[0];
+      if (s0.dx !== 0) roundRect(it.pts[0][0] - 12, it.pts[0][1] - 26, 24, 52, 4);
+      else roundRect(it.pts[0][0] - 26, it.pts[0][1] - 12, 52, 24, 4);
+      ctx.fill();
+      // source letter on the tank cap
+      ctx.fillStyle = '#ffffff'; ctx.font = '600 16px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('ABC'[i], it.pts[0][0], it.pts[0][1] + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    // Outlet pipe
+    const valve = valveEl.value / 100;
+    ctx.beginPath(); outlet.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.strokeStyle = colors.line; ctx.lineWidth = PIPE + 8; ctx.stroke();
+    ctx.strokeStyle = colors.vessel; ctx.lineWidth = PIPE; ctx.stroke();
+    {
+      // open pipe end, drawn across the pipe
+      const e = outlet.end, d = outlet.endDir;
+      ctx.strokeStyle = colors['steel-dark']; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(e.x + d.y * (PIPE / 2 + 8) - d.x * 3, e.y - d.x * (PIPE / 2 + 8) - d.y * 3); ctx.lineTo(e.x - d.y * (PIPE / 2 + 8) - d.x * 3, e.y + d.x * (PIPE / 2 + 8) - d.y * 3); ctx.stroke();
+    }
+    {
+      // packed column: index 0 sits at the valve
+      const pt = pitch(pv), n = outQueue.length;
+      const off = accOut * pt / 2;
+      for (let k = 0; k < n; k++) {
+        const sk = outlet.gateS - 18 - R - k * pt / 2 + off;
+        if (sk < R - 4) break;
+        const p = posAt(outlet, sk, lane(k));
+        dot(p.x, p.y, colors[inlets[outQueue[k]].color]);
+      }
+    }
+
+    // Free-flowing particles
+    for (const q of piping) {
+      if (q.phase === 'in') { const p = posAt(inlets[q.c], q.s, q.off); dot(p.x, p.y, colors[inlets[q.c].color]); }
+      else {
+        // fade as the spray thins out past the pipe end
+        if (q.free) ctx.globalAlpha = Math.max(0, 1 - Math.abs(q.x - outlet.end.x) / (outlet.endDir.x > 0 ? W - outlet.end.x + 40 : outlet.end.x + 40));
+        dot(q.x, q.y, colors[inlets[q.c].color]);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Valves on top of the pipes
+    for (let i = 0; i < 3; i++) {
+      const it = inlets[i], open = sliders[i].value > pv, col = colors[it.color];
+      const c = posAt(it, it.anchorS);
+      if (it.check) {
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(Math.atan2(c.dy, c.dx));
+      ctx.fillStyle = colors.panel; ctx.strokeStyle = open ? col : colors.closed; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = open ? col : colors.closed;
+      ctx.beginPath(); ctx.moveTo(-7, -9); ctx.lineTo(9, 0); ctx.lineTo(-7, 9); ctx.closePath(); ctx.fill();
+      if (!open) ctx.fillRect(9, -10, 3, 20);
+      ctx.restore();
+      ctx.fillStyle = colors.muted; ctx.font = '500 12px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('ONE-WAY VALVE', c.x, c.y + 36);
+      }
+      if (it.gateEl) {
+        const g = posAt(it, it.gateS);
+        drawGate(g.x, g.y, gateOpen(i), false, 'Hand valve ' + 'ABC'[i] + ' ' + it.gateEl.value + '%');
+      }
+
+      // Source dial, placed relative to its anchor point on the pipe
+      const dx = c.x + it.dial[0], dy = c.y + it.dial[1];
+      drawDial(dx, dy, 30, Number(sliders[i].value), col, { marks: [{ v: pv, color: colors.fg, size: 3 }] });
+      const gateShut = it.gateEl && gateOpen(i) === 0;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = colors.fg; ctx.font = '600 13px "Barlow Condensed", sans-serif';
+      ctx.fillText('SOURCE ' + 'ABC'[i], dx + 40, dy - 4);
+      ctx.fillStyle = open && !gateShut ? col : colors.muted; ctx.font = '500 12px "Barlow Condensed", sans-serif';
+      ctx.fillText(!open ? (it.check ? 'ONE-WAY VALVE SHUT' : 'NO FLOW, VESSEL HIGHER') : gateShut ? 'HAND VALVE SHUT' : 'FLOWING', dx + 40, dy + 12);
+    }
+    drawGate(outlet.gate.x, outlet.gate.y, valve, false, 'Outlet valve ' + valveEl.value + '%');
+    ctx.fillStyle = colors.muted; ctx.font = '500 12px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
+
+    // Vessel shell
+    ctx.fillStyle = colors.vessel;
+    ctx.strokeStyle = colors['steel-dark'];
+    ctx.lineWidth = 8;
+    roundRect(V.x - 4, V.y - 4, V.w + 8, V.h + 8, 28); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = colors.vessel;
+    for (const it of inlets) {
+      const m = it.mouth, d = it.endDir;
+      if (d.x === 0) ctx.fillRect(m.x - PIPE / 2, m.y - d.y * 4 - 7, PIPE, 14);
+      else ctx.fillRect(m.x - d.x * 4 - 7, m.y - PIPE / 2, 14, PIPE);
+    }
+    ctx.fillRect(outlet.start.x - PIPE / 2, V.y - 10, PIPE, 14);
+
+    // Pressure tint rising from the bottom
+    const frac = Math.min(1, pv / PMAX);
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.08 + 0.12 * frac;
+    roundRect(V.x, V.y + V.h * (1 - frac), V.w, V.h * frac, 22); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    for (const p of particles) dot(p.x, p.y, colors[inlets[p.c].color]);
+    ctx.fillStyle = colors.muted; ctx.font = '600 14px "Barlow Condensed", sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('VESSEL', V.x + V.w, V.y - 16);
+
+    // Vessel gauge, with each source's pressure marked on the rim
+    const gx = gauge.x, gy = gauge.y;
+    drawDial(gx, gy, gauge.r, pv, colors.accent, {
+      numbers: true,
+      marks: inlets.map((it, i) => ({ v: Number(sliders[i].value), color: colors[it.color], size: 5 })),
+    });
+    ctx.fillStyle = colors.muted; ctx.font = '600 13px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('VESSEL PRESSURE, BAR', gx, gy - gauge.r - 16);
+  }
+
+  const els = {
+    pv: document.getElementById('pv'), count: document.getElementById('count'),
+    v: [0, 1, 2].map(i => document.getElementById('v' + i)),
+    s: [0, 1, 2].map(i => document.getElementById('s' + i)),
+    gv: [0, 1].map(i => document.getElementById('gv' + i)),
+    vv: document.getElementById('vv'), sv: document.getElementById('sv'),
+  };
+  const mixEls = {
+    v: [0, 1, 2].map(i => document.getElementById('mv' + i)), vp: document.getElementById('mvp'),
+    o: [0, 1, 2].map(i => document.getElementById('mo' + i)), op: document.getElementById('mop'),
+  };
+  function setMix(bars, pctEl, counts) {
+    const total = counts[0] + counts[1] + counts[2];
+    const pct = counts.map(c => total ? (100 * c / total) : 0);
+    bars.forEach((b, i) => b.style.width = pct[i] + '%');
+    pctEl.innerHTML = total
+      ? pct.map((p, i) => `<span><i class="dot" style="background:var(--${inlets[i].color})"></i>${'ABC'[i]} ${p.toFixed(0)}%</span>`).join('')
+      : '<span>Nothing yet</span>';
+  }
+  function updateDom() {
+    const pv = vesselPressure();
+    const cv3 = [0, 0, 0]; for (const p of particles) cv3[p.c]++;
+    const co3 = [0, 0, 0]; for (const c of exitLog) co3[c]++;
+    setMix(mixEls.v, mixEls.vp, cv3);
+    setMix(mixEls.o, mixEls.op, co3);
+    els.pv.textContent = pv.toFixed(2) + ' bar';
+    els.count.textContent = particles.length;
+    for (let i = 0; i < 3; i++) {
+      const p = Number(sliders[i].value), g = gateOpen(i);
+      els.v[i].textContent = p.toFixed(1) + ' bar';
+      if (els.gv[i]) els.gv[i].textContent = Math.round(g * 100) + '%';
+      const open = p > pv;
+      let msg, ok = false;
+      if (!open) msg = inlets[i].check ? 'One-way valve shut, vessel pressure is higher' : 'No flow, vessel pressure is higher';
+      else if (g === 0) msg = `Hand valve shut, held back at ${p.toFixed(1)} bar`;
+      else { msg = `Flowing, ${(p - pv).toFixed(2)} bar above vessel, ${(K_IN * g * (p - pv)).toFixed(1)} particles/s`; ok = true; }
+      if (els.s[i]) { els.s[i].textContent = msg; els.s[i].className = 'state' + (ok ? ' open' : ''); }
+    }
+    els.vv.textContent = valveEl.value + '%';
+    if (els.sv) els.sv.textContent = valveEl.value == 0 ? 'Closed, nothing leaves' : `Draining at ${(K_OUT * valveEl.value / 100 * pv).toFixed(1)} particles/s`;
+  }
+
+  let last = performance.now(), domTick = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!paused) step(dt);
+    draw();
+    if ((domTick += dt) > 0.15) { updateDom(); domTick = 0; }
+    requestAnimationFrame(frame);
+  }
+
+  document.getElementById('pause').addEventListener('click', e => {
+    paused = !paused; e.target.textContent = paused ? 'Resume' : 'Pause';
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    particles = []; piping = []; outQueue = []; exitLog = []; acc = [0, 0, 0]; accOut = 0; updateDom();
+  });
+  [...sliders, valveEl, ...inlets.filter(it => it.gateEl).map(it => it.gateEl)].forEach(s => s.addEventListener('input', updateDom));
+
+  // Scenarios: each sets the controls; the vessel keeps its contents and settles from there
+  const PRESETS = {
+    start:     { p: [8, 6, 4], g: [30, 30], valve: 50, note: '<b>Starting point.</b> A and B have more pressure than C, but their hand valves are only 30% open. The vessel settles just under 4 bar, so C still gets in, but only as a trickle.' },
+    weak:      { p: [8, 6, 4], g: [40, 40], valve: 50, note: '<b>Weak source shut out.</b> With their hand valves at 40%, A and B hold the vessel just above 4 bar, so C can\'t get in. Lower A or open the outlet further and watch C start flowing.' },
+    balanced:  { p: [6, 6, 6], g: [100, 100], valve: 50, note: '<b>All balanced.</b> Every source is at 6 bar. The vessel settles near 5 bar and all three colors flow in at the same rate.' },
+    overpower: { p: [10, 5, 5], g: [100, 100], valve: 30, note: '<b>One source overpowers.</b> A at 10 bar pushes the vessel above 5 bar. B and C can\'t push against that, so their flow stops and the vessel slowly turns red.' },
+    throttled: { p: [9, 6, 5], g: [15, 100], valve: 50, note: '<b>Throttled high pressure.</b> A has the highest pressure, but its hand valve is only 15% open. B and C deliver more, so pressure alone doesn\'t decide the mix.' },
+    closed:    { p: [8, 6, 4], g: [100, 100], valve: 0, note: '<b>Outlet closed.</b> Nothing leaves, so the vessel fills until its pressure matches the strongest source (8 bar). Then every inlet stops.' },
+  };
+  const presetBtns = [...document.querySelectorAll('[data-preset]')];
+  const presetNote = document.getElementById('presetNote');
+  function applyPreset(key) {
+    const pr = PRESETS[key];
+    pr.p.forEach((v, i) => sliders[i].value = v);
+    pr.g.forEach((v, i) => document.getElementById('g' + i).value = v);
+    valveEl.value = pr.valve;
+    markPreset(key);
+    updateDom();
+  }
+  const presetSelect = document.getElementById('presetSelect');
+  presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
+  function markPreset(key) {
+    presetBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === key)));
+    presetSelect.value = key || 'custom';
+    presetNote.innerHTML = key ? PRESETS[key].note : 'Custom settings. Pick a scenario above to reset the controls.';
+  }
+  presetBtns.forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+  [...sliders, valveEl, ...inlets.filter(it => it.gateEl).map(it => it.gateEl)].forEach(s => s.addEventListener('input', () => markPreset(null)));
+  markPreset('start');
+
+  // Full screen: real Fullscreen API where the browser allows it, otherwise a fixed overlay that fills the window
+  const show = document.getElementById('show'), fullBtn = document.getElementById('full');
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function setShow(on) {
+    show.classList.toggle('is-show', on);
+    fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+  }
+  fullBtn.addEventListener('click', async () => {
+    if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    if (show.classList.contains('is-show')) { setShow(false); return; }
+    setShow(true);
+    const req = show.requestFullscreen || show.webkitRequestFullscreen;
+    if (req) { try { await req.call(show); } catch (e) { /* stays in window-filling mode */ } }
+  });
+  const onFs = () => { if (!fsEl()) setShow(false); };
+  document.addEventListener('fullscreenchange', onFs);
+  document.addEventListener('webkitfullscreenchange', onFs);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && show.classList.contains('is-show') && !fsEl()) setShow(false); });
+  // Opened from the iPad home screen: start straight in full-screen show mode
+  if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) setShow(true);
+
+  // Scale the control overlay with the diagram; stack it below on narrow screens
+  const stage = document.getElementById('stage'), hud = document.getElementById('hud');
+  // Phones: the shorter screen side is under 600px (iPads are 744px or more)
+  const root = document.documentElement;
+  function setDevice() {
+    const phone = Math.min(innerWidth, innerHeight) < 600;
+    root.classList.toggle('phone', phone);
+    root.classList.toggle('portrait', phone && innerHeight > innerWidth);
+  }
+  function fitHud() {
+    setDevice();
+    const k = cv.clientWidth / W;
+    const phone = root.classList.contains('phone');
+    // On phones the controls stay on the diagram and are enlarged a little so they stay usable
+    const stacked = !phone && k < 0.62;
+    stage.classList.toggle('stacked', stacked);
+    hud.style.transform = stacked ? '' : `scale(${k})`;
+    hud.style.setProperty('--boost', phone && !stacked ? Math.min(1.35, Math.max(1, 0.62 / k)).toFixed(3) : 1);
+  }
+  new ResizeObserver(fitHud).observe(cv);
+  window.addEventListener('resize', fitHud);
+  fitHud();
+
+  // Open in a working state: pre-run so the vessel is already partly mixed.
+  for (let t = 0; t < 6; t += 1 / 60) step(1 / 60);
+  updateDom();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
